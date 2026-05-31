@@ -1,0 +1,39 @@
+# ============================================================
+# Systemd service untuk Timestamp Reader (FastAPI / Uvicorn)
+# ============================================================
+# Install (satu kali di server):
+#   sudo cp timestamp-reader.systemd.service /etc/systemd/system/timestamp-reader.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable timestamp-reader
+#   sudo systemctl start timestamp-reader
+#
+# Edit config: sudo systemctl edit timestamp-reader
+# Reload config: sudo systemctl daemon-reload && sudo systemctl restart timestamp-reader
+# Log live: sudo journalctl -u timestamp-reader -f
+# ============================================================
+
+[Unit]
+Description=Timestamp Reader API (FastAPI / Uvicorn)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/apps/timestamp-reader
+
+# ── Environment ──────────────────────────────────────────────
+# Jika di server Linux path Tesseract bukan di /usr/bin/tesseract, 
+# buka (uncomment) baris di bawah dan isi path yang benar:
+# Environment=TESSERACT_PATH=/usr/local/bin/tesseract
+
+# ── Startup ──────────────────────────────────────────────────
+# Pastikan nama folder virtual environment sesuai (.venv atau venv)
+ExecStart=/home/deploy/apps/timestamp-reader/.venv/bin/python run.py
+
+# Restart otomatis jika crash
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
