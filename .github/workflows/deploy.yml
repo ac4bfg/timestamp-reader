@@ -1,0 +1,62 @@
+name: Deploy Timestamp Reader
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile run.py
+          python -m py_compile app/main.py
+          python -m py_compile app/api/endpoints.py
+          python -m py_compile app/services/ocr_service.py
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 120s
+          script: |
+            # Pindah ke direktori aplikasi
+            cd /home/deploy/apps/timestamp-reader
+
+            # Tarik kode terbaru
+            git pull origin main
+
+            # Perbarui dependencies di virtual environment (asumsi .venv digunakan di server)
+            source .venv/bin/activate
+            pip install -r requirements.txt
+
+            # Restart systemd service
+            sudo systemctl restart timestamp-reader
+            sleep 3
+
+            # Cek status service
+            sudo systemctl status timestamp-reader --no-pager
+
+            # Verifikasi health check endpoint lokal
+            for i in 1 2 3; do
+              curl -sf http://localhost:8098/ || curl -sf http://localhost:8098/api/v1/extract-watermark && break
+              echo "Waiting for workers to start... ($i/3)"
+              sleep 2
+            done
